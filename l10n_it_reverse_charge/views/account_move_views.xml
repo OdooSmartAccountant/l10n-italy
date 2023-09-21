@@ -2,7 +2,9 @@
 <!-- Copyright 2017 Davide Corio
      Copyright 2017 Alex Comba - Agile Business Group
      Copyright 2017 Lorenzo Battistini - Agile Business Group
-     Copyright 2017 Marco Calcagni - Dinamiche Aziendali srl -->
+     Copyright 2017 Marco Calcagni - Dinamiche Aziendali srl
+     Copyright 2023 Simone Rubino - TAKOBI
+    -->
 <odoo>
     <record id="view_invoice_supplier_form_rc" model="ir.ui.view">
         <field name="name">account.invoice.supplier.form.rc</field>
@@ -21,16 +23,10 @@
                 <field name="rc_payment_move_id" />
             </group>
             <xpath
-                expr="//field[@name='invoice_line_ids']/tree/field[@name='tax_ids']"
+                expr="//field[@name='invoice_line_ids']/tree/field[@name='price_subtotal']"
                 position="after"
             >
-                <field name="rc" optional="hide" />
-            </xpath>
-             <xpath
-                expr="//field[@name='line_ids']/tree/field[@name='tax_ids']"
-                position="after"
-            >
-                <field name="rc" invisible="1" />
+                <field name="rc" />
             </xpath>
         </field>
     </record>

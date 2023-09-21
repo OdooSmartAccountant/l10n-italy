@@ -1,4 +1,5 @@
 # Copyright 2021 Alex Comba - Agile Business Group
+# Copyright 2023 Simone Rubino - TAKOBI
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 import base64
@@ -58,13 +59,16 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
         self.selfinvoice_sequence_name = "selfinvoice : Check Number Sequence"
 
     @classmethod
-    def _create_invoice(cls, move_type, partner, name, invoice_date, ref, taxes):
+    def _create_out_rc_invoice(cls, move_type, partner, name, invoice_date, ref, taxes):
         invoice_form = Form(
             cls.env["account.move"].with_context(default_move_type=move_type)
         )
         invoice_form.partner_id = partner
         invoice_form.name = name
         invoice_form.invoice_date = fields.Date.from_string(invoice_date)
+        # Date is not always visible
+        if not invoice_form._get_modifier("date", "invisible"):
+            invoice_form.date = fields.Date.from_string(invoice_date)
         invoice_form.ref = ref
         with invoice_form.invoice_line_ids.new() as line_form:
             line_form.product_id = cls.env.ref("product.product_product_4c")
@@ -77,7 +81,7 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
     def test_intra_EU(self):
         self.supplier_intraEU.property_payment_term_id = self.term_15_30.id
 
-        invoice_form = self._create_invoice(
+        invoice_form = self._create_out_rc_invoice(
             move_type="in_invoice",
             partner=self.supplier_intraEU,
             name="BILL/2021/12/0001",
@@ -114,7 +118,7 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
     def test_intra_EU_customer(self):
         self.supplier_intraEU.property_payment_term_id = self.term_15_30.id
 
-        invoice_form = self._create_invoice(
+        invoice_form = self._create_out_rc_invoice(
             move_type="out_invoice",
             partner=self.supplier_intraEU,
             name="BILL/2021/12/0002",
@@ -129,7 +133,7 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
     def test_intra_EU_draft(self):
         self.supplier_intraEU.property_payment_term_id = self.term_15_30.id
 
-        invoice_form = self._create_invoice(
+        invoice_form = self._create_out_rc_invoice(
             move_type="in_invoice",
             partner=self.supplier_intraEU,
             name="BILL/2021/12/0003",
@@ -149,7 +153,7 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
     def test_intra_EU_supplier_refund(self):
         self.supplier_intraEU.property_payment_term_id = self.term_15_30.id
 
-        invoice_form = self._create_invoice(
+        invoice_form = self._create_out_rc_invoice(
             move_type="in_refund",
             partner=self.supplier_intraEU,
             name="BILL/2021/12/0004",
@@ -184,35 +188,33 @@ class TestFatturaPAXMLValidation(ReverseChargeCommon, FatturaPACommon):
 
     def test_extra_EU(self):
         self.supplier_extraEU.property_payment_term_id = self.term_15_30.id
-        self.rc_type_eeu.with_supplier_self_invoice = False
 
-        invoice_form = self._create_invoice(
+        invoice_form = self._create_out_rc_invoice(
             move_type="in_invoice",
             partner=self.supplier_extraEU,
             name="BILL/2021/12/0005",
             invoice_date="2020-12-01",
             ref="EXEU-SUPPLIER-REF",
-            taxes=self.tax_22ae,
+            taxes=self.tax_0_pur,
         )
         invoice = invoice_form.save()
         invoice.action_post()
+        self_invoice = invoice.rc_self_purchase_invoice_id.rc_self_invoice_id
 
-        self.assertEqual(
-            invoice.rc_self_invoice_id.fiscal_document_type_id.code, "TD17"
-        )
+        self.assertEqual(self_invoice.fiscal_document_type_id.code, "TD17")
         with self.assertRaises(UserError):
             # Impossible to set IdFiscaleIVA
-            self.run_wizard(invoice.rc_self_invoice_id.id)
+            self.run_wizard(self_invoice.id)
         self.supplier_extraEU.vat = "US484762844"
         with self.assertRaises(UserError):
             # Street is not set
-            self.run_wizard(invoice.rc_self_invoice_id.id)
+            self.run_wizard(self_invoice.id)
         self.supplier_extraEU.street = "Street"
         self.supplier_extraEU.zip = "12345"
         self.supplier_extraEU.city = "city"
         self.supplier_extraEU.country_id = self.env.ref("base.us")
         self.supplier_extraEU.is_company = True
-        res = self.run_wizard(invoice.rc_self_invoice_id.id)
+        res = self.run_wizard(self_invoice.id)
         attachment = self.attach_model.browse(res["res_id"])
         self.set_e_invoice_file_id(attachment, "IT10538570960_00004.xml")
         xml_content = base64.decodebytes(attachment.datas)

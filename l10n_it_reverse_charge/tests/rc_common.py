@@ -1,6 +1,21 @@
-from odoo.tests import tagged
+#  Copyright 2023 Simone Rubino - TAKOBI
+#  License LGPG-3.0 or later (https://www.gnu.org/licenses/lgpg).
+
+from odoo.tests import Form, tagged
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+
+
+def _create_form_record(model, record_values, view=None):
+    """Create a record using Form.
+
+    This allows to check required/invisible fields
+    as if the user were creating the record.
+    """
+    form = Form(model, view=view)
+    for field, value in record_values.items():
+        setattr(form, field, value)
+    return form.save()
 
 
 @tagged("post_install", "-at_install")
@@ -91,9 +106,7 @@ class ReverseChargeCommon(AccountTestInvoicingCommon):
         invoice = cls.init_invoice(
             "in_invoice", partner=partner, post=post, amounts=amounts, taxes=taxes
         )
-        for line in invoice.invoice_line_ids.filtered(
-            lambda l: l.display_type == "product"
-        ):
+        for line in invoice.invoice_line_ids:
             line.account_id = cls.invoice_line_account.id
         return invoice
 
@@ -125,24 +138,6 @@ class ReverseChargeCommon(AccountTestInvoicingCommon):
                 "amount": 22,
             }
         )
-
-        (
-            cls.tax_22ai.invoice_repartition_line_ids
-            + cls.tax_22ai.refund_repartition_line_ids
-        ).filtered(
-            lambda repartition_line_id: repartition_line_id.repartition_type == "tax"
-        ).write(
-            {
-                "account_id": cls.env["account.account"].search(
-                    [
-                        ("company_id", "=", cls.env.company.id),
-                        ("account_type", "=", "asset_current"),
-                    ],
-                    limit=1,
-                )
-            }
-        )
-
         cls.tax_22vi = tax_model.create(
             {"name": "Tax 22% Sales Intra-EU", "type_tax_use": "sale", "amount": 22}
         )
@@ -162,50 +157,43 @@ class ReverseChargeCommon(AccountTestInvoicingCommon):
     @classmethod
     def _create_journals(cls):
         journal_model = cls.env["account.journal"]
-        cls.journal_selfinvoice = journal_model.create(
+        cls.journal_selfinvoice = _create_form_record(
+            journal_model,
             {
                 "name": "selfinvoice",
                 "type": "sale",
                 "code": "SLF",
-                "default_account_id": cls.env["account.account"]
-                .search(
-                    [
-                        ("company_id", "=", cls.env.company.id),
-                        ("account_type", "=", "income"),
-                    ],
-                    limit=1,
-                )
-                .id,
-            }
+                "default_account_id": cls.account_selfinvoice,
+            },
         )
 
-        cls.journal_reconciliation = journal_model.create(
+        cls.journal_reconciliation = _create_form_record(
+            journal_model,
             {
                 "name": "RC reconciliation",
                 "type": "general",
                 "code": "SLFRC",
-            }
+            },
         )
 
-        cls.journal_selfinvoice_extra = journal_model.create(
-            {"name": "Extra selfinvoice", "type": "sale", "code": "SLFEX"}
+        cls.journal_selfinvoice_extra = _create_form_record(
+            journal_model,
+            {
+                "name": "Extra selfinvoice",
+                "type": "sale",
+                "code": "SLFEX",
+                "default_account_id": cls.account_selfinvoice,
+            },
         )
 
-        cls.journal_cee_extra = journal_model.create(
+        cls.journal_cee_extra = _create_form_record(
+            journal_model,
             {
                 "name": "Extra CEE",
                 "type": "purchase",
                 "code": "EXCEE",
-                "default_account_id": cls.env["account.account"]
-                .search(
-                    [
-                        ("company_id", "=", cls.env.company.id),
-                        ("account_type", "=", "expense"),
-                    ],
-                    limit=1,
-                )
-                .id,
-            }
+                "default_account_id": cls.account_selfinvoice,
+            },
         )
 
     @classmethod

@@ -59,7 +59,6 @@ class TestRegistry(TransactionCase):
                 ],
             }
         )
-        invoice._onchange_quick_edit_line_ids()
         invoice.action_post()
 
         wizard = self.env["wizard.registro.iva"].create(

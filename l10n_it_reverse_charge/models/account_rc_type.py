@@ -2,6 +2,7 @@
 # Copyright 2017 Alex Comba - Agile Business Group
 # Copyright 2017 Lorenzo Battistini - Agile Business Group
 # Copyright 2017 Marco Calcagni - Dinamiche Aziendali srl
+# Copyright 2023 Simone Rubino - TAKOBI
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError

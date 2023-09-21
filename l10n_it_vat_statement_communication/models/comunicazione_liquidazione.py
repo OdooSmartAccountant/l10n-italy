@@ -94,15 +94,16 @@ class ComunicazioneLiquidazione(models.Model):
     iva_a_credito = fields.Float(string="Credit VAT", readonly=True)
 
     @api.model_create_multi
-    def create(self, vals):
-        comunicazione = super(ComunicazioneLiquidazione, self).create(vals)
-        comunicazione._validate()
-        return comunicazione
+    def create(self, vals_list):
+        communications = super().create(vals_list)
+        for communication in communications:
+            communication._validate()
+        return communications
 
     def write(self, vals):
-        super(ComunicazioneLiquidazione, self).write(vals)
-        for comunicazione in self:
-            comunicazione._validate()
+        super().write(vals)
+        for communication in self:
+            communication._validate()
         return True
 
     @api.onchange("company_id")
@@ -147,6 +148,7 @@ class ComunicazioneLiquidazione(models.Model):
         """
         Controllo congruità dati della comunicazione
         """
+        self.ensure_one()
         # Anno obbligatorio
         if not self.year:
             raise ValidationError(_("Year required"))

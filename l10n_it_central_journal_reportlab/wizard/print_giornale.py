@@ -201,7 +201,11 @@ class WizardGiornaleReportlab(models.TransientModel):
     def get_template_header_report_giornale(self, report, height_available):
         report.setFont("Helvetica-Bold", 12)
         height_available -= gap
-        report.drawString(margin_left, height_available, self.env.user.company_id.name)
+        report.drawString(
+            margin_left,
+            height_available,
+            self.env.user.company_id.name + _(" Account Central Journal"),
+        )
         report.setFont("Helvetica", 10)
         text = ""
         if self.env.user.company_id.street:
@@ -588,14 +592,14 @@ class WizardGiornaleReportlab(models.TransientModel):
         self.daterange_id.write(daterange_vals)
 
         view_id = self.env.ref(
-            "l10n_it_central_journal_reportlab.l10n_it_wizard_giornale_reportlab",
+            "l10n_it_central_journal_reportlab.wizard_giornale_reportlab",
             raise_if_not_found=False,
         )
 
         return {
             "view_id": view_id.id,
             "view_mode": "form",
-            "res_model": "l10n_it_wizard.giornale.reportlab",
+            "res_model": "wizard.giornale.reportlab",
             "res_id": self.id,
             "type": "ir.actions.act_window",
             "target": "new",

@@ -1,5 +1,6 @@
 # Copyright 2018 Simone Rubino - Agile Business Group
 # Copyright 2019 Alex Comba - Agile Business Group
+# Copyright 2023 Simone Rubino - TAKOBI
 
 from odoo.exceptions import UserError
 from odoo.tests import tagged
@@ -83,7 +84,6 @@ class TestReverseCharge(ReverseChargeCommon):
         invoice.button_draft()
         # see what done with "with invoice.env.do_in_draft()" in
         # button_draft
-        invoice.invalidate_model()
         self.assertEqual(invoice.state, "draft")
 
     def test_intra_EU_cancel_and_draft(self):
@@ -92,7 +92,6 @@ class TestReverseCharge(ReverseChargeCommon):
         invoice.button_cancel()
         self.assertEqual(invoice.state, "cancel")
         invoice.button_draft()
-        invoice.invalidate_model()
         self.assertEqual(invoice.state, "draft")
 
     def test_intra_EU_zero_total(self):
@@ -109,7 +108,6 @@ class TestReverseCharge(ReverseChargeCommon):
         self.assertEqual(invoice.state, "cancel")
         self.assertFalse(invoice.rc_self_invoice_id)
         invoice.button_draft()
-        invoice.invalidate_model()
         self.assertEqual(invoice.state, "draft")
 
     def test_new_refund_flag(self):
@@ -132,7 +130,6 @@ class TestReverseCharge(ReverseChargeCommon):
         invoice.button_cancel()
         self.assertEqual(invoice.state, "cancel")
         invoice.button_draft()
-        invoice.invalidate_model()
         self.assertEqual(invoice.state, "draft")
 
     def test_intra_EU_draft_and_reconfirm(self):
@@ -173,3 +170,22 @@ class TestReverseCharge(ReverseChargeCommon):
 
         payments_lines = (self_purchase_payment | self_purchase_rc_payment).line_ids
         self.assertTrue(all(payments_lines.mapped("reconciled")))
+
+    def test_extra_EU_draft_and_reconfirm(self):
+        """Check that an invoice with RC Self Purchase Invoice
+        can be reset to draft and confirmed again."""
+        # Arrange
+        invoice = self.create_invoice(
+            self.supplier_extraEU,
+            amounts=[100],
+            taxes=self.tax_0_pur,
+        )
+        # pre-condition
+        self.assertTrue(invoice.rc_self_purchase_invoice_id)
+
+        # Act
+        invoice.button_draft()
+        invoice.action_post()
+
+        # Assert
+        self.assertEqual(invoice.state, "posted")

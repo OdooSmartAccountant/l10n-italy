@@ -3,45 +3,61 @@
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests.common import Form, TransactionCase
+from odoo.tests.common import Form, tagged
+
+from odoo.addons.account.tests.common import TestAccountReconciliationCommon
 
 
-class VatStatementCommunicationCase(TransactionCase):
-    def setUp(self):
-        super(VatStatementCommunicationCase, self).setUp()
+@tagged("post_install")
+class VatStatementCommunicationCase(TestAccountReconciliationCommon):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
 
         # Comunicazione liquidazione
 
-        self.comunicazione_liquidazione = self.env["comunicazione.liquidazione"].create(
-            self.get_vals_comunicazione_liquidazione()
+        cls.comunicazione_liquidazione = cls.env["comunicazione.liquidazione"].create(
+            cls.get_vals_comunicazione_liquidazione(cls)
         )
         # Journals
 
-        self.miscellaneous_journal = self.env["account.journal"].search(
-            [("type", "=", "general")], limit=1
+        cls.miscellaneous_journal = cls.env["account.journal"].search(
+            [("type", "=", "general"), ("company_id", "=", cls.env.company.id)], limit=1
         )
 
         # Accounts
 
-        self.account_erario = self.env["account.account"].search(
-            [("code", "=", "252000")], limit=1
+        cls.account_erario = cls.env["account.account"].search(
+            [("code", "=", "252000"), ("company_id", "=", cls.env.company.id)], limit=1
         )
-        self.account_interessi = self.env["account.account"].search(
-            [("code", "=", "600000")], limit=1
+        cls.account_interessi = cls.env["account.account"].search(
+            [("code", "=", "600000"), ("company_id", "=", cls.env.company.id)], limit=1
         )
 
-        self.paid_vat_account = self.env["account.account"].search(
-            [("account_type", "=", "asset_current")], limit=1
+        cls.paid_vat_account = cls.env["account.account"].search(
+            [
+                ("account_type", "=", "asset_current"),
+                ("company_id", "=", cls.env.company.id),
+            ],
+            limit=1,
         )
-        self.received_vat_account = self.env["account.account"].search(
-            [("account_type", "=", "liability_current")], limit=1
+        cls.received_vat_account = cls.env["account.account"].search(
+            [
+                ("account_type", "=", "liability_current"),
+                ("company_id", "=", cls.env.company.id),
+            ],
+            limit=1,
         )
+
+        # Products
+
+        cls.product_product_10 = cls.env.ref("product.product_product_10")
 
         # Taxes
 
-        tax_model = self.env["account.tax"]
+        tax_model = cls.env["account.tax"]
 
-        self.tax_22_purchase = tax_model.create(
+        cls.tax_22_purchase = tax_model.create(
             {
                 "name": "IVA 22 Purchase",
                 "description": "22",
@@ -63,7 +79,7 @@ class VatStatementCommunicationCase(TransactionCase):
                         {
                             "factor_percent": 100,
                             "repartition_type": "tax",
-                            "account_id": self.paid_vat_account.id,
+                            "account_id": cls.paid_vat_account.id,
                         },
                     ),
                 ],
@@ -83,14 +99,14 @@ class VatStatementCommunicationCase(TransactionCase):
                         {
                             "factor_percent": 100,
                             "repartition_type": "tax",
-                            "account_id": self.paid_vat_account.id,
+                            "account_id": cls.paid_vat_account.id,
                         },
                     ),
                 ],
             }
         )
 
-        self.tax_22_sale = tax_model.create(
+        cls.tax_22_sale = tax_model.create(
             {
                 "name": "IVA 22 Sale",
                 "description": "22",
@@ -112,7 +128,7 @@ class VatStatementCommunicationCase(TransactionCase):
                         {
                             "factor_percent": 100,
                             "repartition_type": "tax",
-                            "account_id": self.received_vat_account.id,
+                            "account_id": cls.received_vat_account.id,
                         },
                     ),
                 ],
@@ -132,7 +148,7 @@ class VatStatementCommunicationCase(TransactionCase):
                         {
                             "factor_percent": 100,
                             "repartition_type": "tax",
-                            "account_id": self.received_vat_account.id,
+                            "account_id": cls.received_vat_account.id,
                         },
                     ),
                 ],
@@ -140,24 +156,25 @@ class VatStatementCommunicationCase(TransactionCase):
         )
 
         # Set VAT revenue account in taxes to take in VAT statement
-        self.env["account.tax"].search([("type_tax_use", "=", "sale")]).write(
-            {"vat_statement_account_id": self.received_vat_account.id}
+        cls.env["account.tax"].search([("type_tax_use", "=", "sale")]).write(
+            {"vat_statement_account_id": cls.received_vat_account.id}
         )
-        self.env["account.tax"].search([("type_tax_use", "=", "purchase")]).write(
-            {"vat_statement_account_id": self.paid_vat_account.id}
+        cls.env["account.tax"].search([("type_tax_use", "=", "purchase")]).write(
+            {"vat_statement_account_id": cls.paid_vat_account.id}
         )
 
         # Partners
 
-        self.res_partner_1 = self.env.ref("base.res_partner_1")
+        cls.res_partner_1 = cls.env.ref("base.res_partner_1")
 
         # Type of periods
 
-        self.type_month = self.env["date.range.type"].create({"name": "Month"})
+        cls.type_month = cls.env["date.range.type"].create({"name": "Month"})
 
-        self.type_quarter = self.env["date.range.type"].create({"name": "Quarter"})
+        cls.type_quarter = cls.env["date.range.type"].create({"name": "Quarter"})
 
     def get_vals_comunicazione_liquidazione(self):
+        # Returns the dictionary of VAT settlement's info
         return {
             "year": 2022,
             "taxpayer_vat": "11876260784",
@@ -165,30 +182,6 @@ class VatStatementCommunicationCase(TransactionCase):
             "declarant_fiscalcode": "FNCPLC19D01I168X",
             "codice_carica_id": self.env.ref("l10n_it_appointment_code.1").id,
         }
-
-    def _create_invoice(self, invoice_date, move_type="out_invoice", amount=1.0):
-        if move_type == "out_invoece":
-            tax = self.tax_22_sale
-        else:
-            tax = self.tax_22_purchase
-
-        product_product_10 = self.env.ref("product.product_product_10")
-
-        with Form(
-            self.env["account.move"].with_context(default_move_type=move_type)
-        ) as move_form:
-            move_form.invoice_date = fields.Date.from_string(invoice_date)
-            move_form.partner_id = self.res_partner_1
-            with move_form.invoice_line_ids.new() as line_form:
-                line_form.product_id = product_product_10
-                line_form.price_unit = amount
-                line_form.quantity = 1
-                line_form.tax_ids.clear()
-                line_form.tax_ids.add(tax)
-
-        invoice = move_form.save()
-
-        return invoice
 
     def _create_vat_statement(
         self,
@@ -199,6 +192,7 @@ class VatStatementCommunicationCase(TransactionCase):
         date_start_period,
         date_end_period,
     ):
+        # Creates VAT statements in period
         with Form(self.env["account.vat.period.end.statement"]) as vat_statement_form:
             vat_statement_form.journal_id = self.miscellaneous_journal
             vat_statement_form.date = fields.Date.from_string(vat_statement_date)
@@ -225,6 +219,7 @@ class VatStatementCommunicationCase(TransactionCase):
         return vat_statement
 
     def test_name(self):
+        # Checks name of VAT statements
         comunicazione_liquidazione = self.env["comunicazione.liquidazione"].create(
             self.get_vals_comunicazione_liquidazione()
         )
@@ -260,6 +255,7 @@ class VatStatementCommunicationCase(TransactionCase):
         self.assertEqual(comunicazione_liquidazione.name, "2022 quarter, 1")
 
     def test_identificativo(self):
+        # Checks identificatiovo of VAT statements
         comunicazione_liquidazione = self.env["comunicazione.liquidazione"].create(
             self.get_vals_comunicazione_liquidazione()
         )
@@ -278,6 +274,7 @@ class VatStatementCommunicationCase(TransactionCase):
         self.assertEqual(comunicazione_liquidazione.identificativo, 3)
 
     def test_validate(self):
+        # Checks if there are some error in VAT statement's dictionary info
         with self.assertRaises(ValidationError):
             vals = self.get_vals_comunicazione_liquidazione()
             vals["taxpayer_fiscalcode"] = "FNCPLC"
@@ -329,6 +326,7 @@ class VatStatementCommunicationCase(TransactionCase):
             self.env["comunicazione.liquidazione"].create(vals)
 
     def test_onchange_company(self):
+        # Checks if company is correct
         comunicazione_liquidazione = self.env["comunicazione.liquidazione"].create(
             self.get_vals_comunicazione_liquidazione()
         )
@@ -366,6 +364,7 @@ class VatStatementCommunicationCase(TransactionCase):
         )
 
     def _check_file_report(self, comunicazione_liquidazione):
+        # Checks if there is the export file
         wizard = (
             self.env["comunicazione.liquidazione.export.file"]
             .with_context(active_ids=comunicazione_liquidazione.ids)
@@ -379,6 +378,7 @@ class VatStatementCommunicationCase(TransactionCase):
         self.assertTrue(wizard.file_export)
 
     def test_export_xml(self):
+        # Checks whole flow of VAT statement
         with self.assertRaises(UserError):
             wizard = self.env["comunicazione.liquidazione.export.file"].create({})
             wizard.export()
@@ -412,35 +412,73 @@ class VatStatementCommunicationCase(TransactionCase):
 
         # Invoices july 2022
 
-        invoice_july_customer = self._create_invoice("2022-07-01", "out_invoice", 10.0)
+        invoice_july_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-07-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
+        )
 
         invoice_july_customer.action_post()
 
-        invoice_july_vendor = self._create_invoice("2022-07-01", "in_invoice", 5.0)
+        invoice_july_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-07-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_july_vendor.action_post()
 
         # Invoices august 2022
 
-        invoice_august_customer = self._create_invoice(
-            "2022-08-01", "out_invoice", 10.0
+        invoice_august_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-08-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
         )
 
         invoice_august_customer.action_post()
 
-        invoice_august_vendor = self._create_invoice("2022-08-01", "in_invoice", 5.0)
+        invoice_august_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-08-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_august_vendor.action_post()
 
         # Invoices september 2022
 
-        invoice_september_customer = self._create_invoice(
-            "2022-09-01", "out_invoice", 10.0
+        invoice_september_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-09-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
         )
 
         invoice_september_customer.action_post()
 
-        invoice_september_vendor = self._create_invoice("2022-09-01", "in_invoice", 5.0)
+        invoice_september_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-09-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_september_vendor.action_post()
 
@@ -484,37 +522,74 @@ class VatStatementCommunicationCase(TransactionCase):
         # Invoices last quarter 2022
 
         # October
-        invoice_october_customer = self._create_invoice(
-            "2022-10-01", "out_invoice", 10.0
+
+        invoice_october_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-10-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
         )
 
         invoice_october_customer.action_post()
 
-        invoice_october_vendor = self._create_invoice("2022-10-01", "in_invoice", 5.0)
+        invoice_october_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-10-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_october_vendor.action_post()
 
         # November
 
-        invoice_november_customer = self._create_invoice(
-            "2022-11-01", "out_invoice", 10.0
+        invoice_november_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-11-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
         )
 
         invoice_november_customer.action_post()
 
-        invoice_november_vendor = self._create_invoice("2022-11-01", "in_invoice", 5.0)
+        invoice_november_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-11-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_november_vendor.action_post()
 
         # December
 
-        invoice_december_customer = self._create_invoice(
-            "2022-12-01", "out_invoice", 10.0
+        invoice_december_customer = self.init_invoice(
+            "out_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-12-01",
+            products=self.product_product_10,
+            amounts=[10.0],
+            taxes=self.tax_22_sale,
         )
 
         invoice_december_customer.action_post()
 
-        invoice_december_vendor = self._create_invoice("2022-12-01", "in_invoice", 5.0)
+        invoice_december_vendor = self.init_invoice(
+            "in_invoice",
+            partner=self.res_partner_1,
+            invoice_date="2022-12-01",
+            products=self.product_product_10,
+            amounts=[5.0],
+            taxes=self.tax_22_purchase,
+        )
 
         invoice_december_vendor.action_post()
 

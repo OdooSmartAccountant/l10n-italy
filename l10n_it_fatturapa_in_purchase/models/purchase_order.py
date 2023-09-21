@@ -2,7 +2,7 @@
 # Copyright 2018 Sergio Zanchetta (Associazione PNLUG - Gruppo Odoo)
 # Copyright 2019 Simone Rubino - Agile Business Group
 
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.tools import float_compare
 
 
@@ -23,7 +23,6 @@ class POLine(models.Model):
                 line.to_invoice = False
         return res
 
-    @api.depends("order_id.name", "name")
     def name_get(self):
         res = []
         for line in self:

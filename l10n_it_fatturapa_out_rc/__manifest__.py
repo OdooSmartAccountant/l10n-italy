@@ -1,5 +1,6 @@
 # Copyright 2020 Lorenzo Battistini @ TAKOBI
 # Copyright 2021 Alex Comba - Agile Business Group
+# Copyright 2023 Simone Rubino - TAKOBI
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 {
     "name": "ITA - Emissione e-fattura con reverse charge",
