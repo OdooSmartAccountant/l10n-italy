@@ -132,6 +132,7 @@ class WizardExportFatturapa(models.TransientModel):
             tax_line_id = tax_id.tax_line_id
             aliquota = format_numbers(tax_line_id.amount)
             key = _key(tax_line_id)
+            tax_amount = 0.0
             if invoice.move_type == 'out_invoice':
                 if tax_id.credit == 0.0 and tax_id.debit:
                     tax_amount = -tax_id.balance
@@ -142,7 +143,6 @@ class WizardExportFatturapa(models.TransientModel):
             out_computed[key] = {
                 "AliquotaIVA": aliquota,
                 "Natura": tax_line_id.kind_id.code,
-                # 'Arrotondamento':'',
                 "ImponibileImporto": tax_id.tax_base_amount,
                 "Imposta": tax_amount,
                 "EsigibilitaIVA": tax_line_id.payability,
