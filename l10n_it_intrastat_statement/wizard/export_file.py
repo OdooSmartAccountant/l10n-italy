@@ -28,14 +28,10 @@ class AccountIntrastatExportFile(models.TransientModel):
 
         out = base64.encodebytes(file.encode())
 
-        if self.env.ref(
+        view = self.env.ref(
             "l10n_it_intrastat_statement.wizard_account_intrastat_export_file"
-        ):
-            view_id = self.env.ref(
-                "l10n_it_intrastat_statement.wizard_account_intrastat_export_file"
-            ).id
-        else:
-            view_id = False
+        )
+        view_id = view.id
 
         self.write({"state": "get", "data": out, "name": filename})
         return {
