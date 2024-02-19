@@ -1,4 +1,5 @@
 # Copyright 2018 Sergio Corato (https://efatto.it)
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 {
     "name": "ITA - Fattura elettronica - Inversione contabile",

@@ -81,7 +81,7 @@ class AccountMove(models.Model):
     def _post(self, soft=True):
         posted = super()._post(soft)
         # Check if there is enough available amount on declarations
-        for invoice in self:
+        for invoice in self.filtered(lambda m: m.is_invoice()):
             declarations = invoice.get_declarations()
             # If partner has no declarations, do nothing
             if not declarations:
@@ -230,7 +230,7 @@ class AccountMove(models.Model):
         declarations_residual = sum(
             [declarations_amounts[da] for da in declarations_amounts]
         )
-        if declarations_residual < 0:
+        if self.currency_id.compare_amounts(declarations_residual, 0) == -1:
             raise UserError(
                 _("Available plafond insufficent.\n" "Excess value: %s")
                 % (abs(declarations_residual))
@@ -242,7 +242,12 @@ class AccountMove(models.Model):
             declaration = declaration_model.browse(declaration_id)
             # declarations_amounts contains residual, so, if > limit_amount,
             # used_amount went < 0
-            if declarations_amounts[declaration_id] > declaration.limit_amount:
+            if (
+                self.currency_id.compare_amounts(
+                    declarations_amounts[declaration_id], declaration.limit_amount
+                )
+                == 1
+            ):
                 excess = abs(
                     declarations_amounts[declaration_id] - declaration.limit_amount
                 )

@@ -2,11 +2,12 @@
 #  Copyright 2012-17 Agile Business Group (<http://www.agilebg.com>)
 #  Copyright 2012-15 LinkIt Spa (<http://http://www.linkgroup.it>)
 #  Copyright 2015 Associazione Odoo Italia (<http://www.odoo-italia.org>)
+#  Copyright 2021 Gianmarco Conte - Dinamiche Aziendali Srl (<www.dinamicheaziendali.it>)
 #  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 {
     "name": "ITA - Liquidazione IVA",
-    "version": "16.0.1.1.0",
+    "version": "16.0.1.2.1",
     "category": "Localization/Italy",
     "summary": "Allow to create the 'VAT Statement'.",
     "license": "AGPL-3",
@@ -32,7 +33,8 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "account_vat_period_end_statement/static/src/css/l10n_it_vat_registries.css",
+            "account_vat_period_end_statement/static/src/css/"
+            "account_vat_period_end_statement.css",
         ],
     },
     "installable": True,
