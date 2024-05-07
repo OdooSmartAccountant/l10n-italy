@@ -172,6 +172,7 @@ class TestTaxSP(AccountTestInvoicingCommon):
             {
                 "value": "balance",
                 "days": 16,
+                "end_month": True,
                 "payment_id": cls.account_payment_term.id,
             }
         )
@@ -248,6 +249,17 @@ class TestTaxSP(AccountTestInvoicingCommon):
         self.assertEqual(self.vat_statement.generic_vat_account_line_ids.amount, 22.0)
 
     def test_account_sp_company(self):
+        account_type = self.company.sp_account_id.account_type
+        account_sp = self.account_model.create(
+            dict(
+                code="split.payment.acc",
+                name="Split payment account",
+                account_type=account_type,
+                reconcile=True,
+            )
+        )
+        self.company.sp_account_id = account_sp.id
+
         invoice = self.move_model.with_context(default_move_type="out_invoice").create(
             {
                 "invoice_date": self.recent_date,
@@ -281,6 +293,5 @@ class TestTaxSP(AccountTestInvoicingCommon):
         self.current_period.vat_statement_id = self.vat_statement
         self.vat_statement.compute_amounts()
         self.assertEqual(
-            self.vat_statement.generic_vat_account_line_ids.account_id.id,
-            self.company.sp_account_id.id,
+            self.vat_statement.generic_vat_account_line_ids.account_id.id, account_sp.id
         )

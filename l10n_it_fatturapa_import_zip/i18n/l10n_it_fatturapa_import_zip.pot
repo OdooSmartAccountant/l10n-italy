@@ -221,7 +221,6 @@ msgstr ""
 
 #. module: l10n_it_fatturapa_import_zip
 #: model:ir.model.fields,help:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__message_has_error
-#: model:ir.model.fields,help:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__message_has_sms_error
 msgid "If checked, some messages have a delivery error."
 msgstr ""
 
@@ -304,6 +303,11 @@ msgstr ""
 #. module: l10n_it_fatturapa_import_zip
 #: model:ir.model,name:l10n_it_fatturapa_import_zip.model_account_move
 msgid "Journal Entry"
+msgstr ""
+
+#. module: l10n_it_fatturapa_import_zip
+#: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__key
+msgid "Key"
 msgstr ""
 
 #. module: l10n_it_fatturapa_import_zip
@@ -428,11 +432,6 @@ msgid "Responsible User"
 msgstr ""
 
 #. module: l10n_it_fatturapa_import_zip
-#: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__message_has_sms_error
-msgid "SMS Delivery error"
-msgstr ""
-
-#. module: l10n_it_fatturapa_import_zip
 #: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__state
 msgid "State"
 msgstr ""
@@ -452,6 +451,11 @@ msgid "Stored Filename"
 msgstr ""
 
 #. module: l10n_it_fatturapa_import_zip
+#: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__theme_template_id
+msgid "Theme Template"
+msgstr ""
+
+#. module: l10n_it_fatturapa_import_zip
 #: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__type
 msgid "Type"
 msgstr ""
@@ -464,6 +468,11 @@ msgstr ""
 #. module: l10n_it_fatturapa_import_zip
 #: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__url
 msgid "Url"
+msgstr ""
+
+#. module: l10n_it_fatturapa_import_zip
+#: model:ir.model.fields,field_description:l10n_it_fatturapa_import_zip.field_fatturapa_attachment_import_zip__website_id
+msgid "Website"
 msgstr ""
 
 #. module: l10n_it_fatturapa_import_zip

@@ -1,5 +1,6 @@
 # Author(s): Silvio Gregorini (silviogregorini@openforce.it)
 # Copyright 2019 Openforce Srls Unipersonale (www.openforce.it)
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import _, api, fields, models
@@ -41,12 +42,12 @@ class AssetAccountingInfo(models.Model):
         "asset.depreciation.line", ondelete="set null", string="Depreciation Line"
     )
     move_type = fields.Selection(related="dep_line_id.move_type")
-    move_id = fields.Many2one("account.move", ondelete="set null", string="Move")
-
     move_line_id = fields.Many2one(
-        "account.move.line", ondelete="set null", string="Move Line"
+        "account.move.line", ondelete="cascade", string="Move Line"
     )
-
+    move_id = fields.Many2one(
+        "account.move", related="move_line_id.move_id", string="Move"
+    )
     relation_type = fields.Selection(
         [
             ("create", "Asset Creation"),
@@ -59,9 +60,12 @@ class AssetAccountingInfo(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        info = super().create(vals_list)
-        info.check_and_normalize()
-        return info
+        all_info = self.browse()
+        for vals in vals_list:
+            info = super().create(vals)
+            info.check_and_normalize()
+            all_info |= info
+        return all_info
 
     def write(self, vals):
         fnames = self.get_main_fields()
@@ -106,7 +110,18 @@ class AssetAccountingInfo(models.Model):
 
     def button_unlink(self):
         """Button action: deletes a.a.info"""
+        other_asset_accounting_info = self.env["asset.accounting.info"].search(
+            [
+                ("id", "!=", self.id),
+                ("dep_line_id", "=", self.dep_line_id.id),
+            ]
+        )
+        dep_line_to_delete = self.env["asset.depreciation.line"]
+        if not other_asset_accounting_info:
+            dep_line_to_delete = self.dep_line_id
         self.unlink()
+        if dep_line_to_delete:
+            dep_line_to_delete.unlink()
 
     def check_and_normalize(self):
         for info in self:

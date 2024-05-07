@@ -139,7 +139,10 @@ class AccountMove(models.Model):
         is_zero = self.currency_id.is_zero
         for move_line in self.line_ids:
             field_value = getattr(move_line, line_field)
-            if not is_zero(field_value):
+            if not is_zero(field_value) and move_line.account_id.account_type in (
+                "asset_receivable",
+                "liability_payable",
+            ):
                 break
         else:
             raise UserError(
@@ -194,6 +197,7 @@ class AccountMove(models.Model):
             "credit": credit,
             "debit": debit,
             "account_id": account.id,
+            "currency_id": self.currency_id.id,
         }
 
     def _rc_credit_line_amounts(self, amount):
@@ -528,7 +532,7 @@ class AccountMove(models.Model):
             ):
                 inv.rc_self_purchase_invoice_id.remove_rc_payment()
                 inv.rc_self_purchase_invoice_id.button_cancel()
-        return super(AccountMove, self).button_cancel()
+        return super().button_cancel()
 
     def button_draft(self):
         new_self = self.with_context(rc_set_to_draft=True)

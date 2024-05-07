@@ -1,9 +1,11 @@
 # Author(s): Silvio Gregorini (silviogregorini@openforce.it)
 # Copyright 2019 Openforce Srls Unipersonale (www.openforce.it)
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.fields import Command
 
 
 class AssetDepreciationLine(models.Model):
@@ -25,7 +27,10 @@ class AssetDepreciationLine(models.Model):
         string="Asset",
     )
 
-    balance = fields.Monetary(compute="_compute_balance", store=True)
+    balance = fields.Monetary(
+        compute="_compute_balance",
+        store=True,
+    )
 
     base = fields.Float()
 
@@ -41,7 +46,9 @@ class AssetDepreciationLine(models.Model):
         related="depreciation_id.currency_id",
     )
 
-    date = fields.Date(required=True)
+    date = fields.Date(
+        required=True,
+    )
 
     depreciation_id = fields.Many2one(
         "asset.depreciation",
@@ -88,7 +95,9 @@ class AssetDepreciationLine(models.Model):
         required=True,
     )
 
-    name = fields.Char(required=True)
+    name = fields.Char(
+        required=True,
+    )
 
     partial_dismissal = fields.Boolean()
 
@@ -117,10 +126,13 @@ class AssetDepreciationLine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        line = super().create(vals_list)
-        if line.need_normalize_depreciation_nr():
-            line.normalize_depreciation_nr(force=True)
-        return line
+        lines = self.browse()
+        for vals in vals_list:
+            line = super().create(vals)
+            if line.need_normalize_depreciation_nr():
+                line.normalize_depreciation_nr(force=True)
+            lines |= line
+        return lines
 
     def write(self, vals):
         res = super().write(vals)
@@ -130,18 +142,10 @@ class AssetDepreciationLine(models.Model):
                 line.normalize_depreciation_nr(force=True)
         return res
 
-    def unlink(self):
-        if self.mapped("asset_accounting_info_ids"):
-            lines = self.filtered("asset_accounting_info_ids")
-            name_list = "\n".join([line[-1] for line in lines.name_get()])
-            raise ValidationError(
-                _(
-                    "The lines you you are trying to delete are currently"
-                    " linked to accounting info. Please remove them if"
-                    " necessary before removing these lines:\n"
-                )
-                + name_list
-            )
+    @api.ondelete(
+        at_uninstall=False,
+    )
+    def _unlink_except_open_move(self):
         if any([m.state != "draft" for m in self.mapped("move_id")]):
             lines = self.filtered(
                 lambda line: line.move_id and line.move_id.state != "draft"
@@ -154,6 +158,9 @@ class AssetDepreciationLine(models.Model):
                 )
                 + name_list
             )
+
+    def unlink(self):
+        self.mapped("asset_accounting_info_ids").unlink()
         self.mapped("move_id").unlink()
         return super().unlink()
 
@@ -166,9 +173,10 @@ class AssetDepreciationLine(models.Model):
             if len(comp) > 1 or (comp and comp != dep_line.company_id):
                 raise ValidationError(
                     _(
-                        "`{}`: cannot change depreciation line's company once"
-                        " it's already related to an asset."
-                    ).format(dep_line.make_name())
+                        "`%(dep_line)s`: cannot change depreciation line's company once"
+                        " it's already related to an asset.",
+                        dep_line=dep_line.make_name(),
+                    )
                 )
 
     @api.constrains("depreciation_nr")
@@ -264,7 +272,7 @@ class AssetDepreciationLine(models.Model):
 
     def make_name(self):
         self.ensure_one()
-        return "{} ({})".format(self.name, self.depreciation_id.make_name())
+        return f"{self.name} ({self.depreciation_id.make_name()})"
 
     def need_normalize_depreciation_nr(self):
         """Check if numbers need to be normalized"""
@@ -306,7 +314,6 @@ class AssetDepreciationLine(models.Model):
         :param force: force normalization for every depreciations' lines
         """
         for dep in self.mapped("depreciation_id"):
-
             # Avoid if user chooses to use custom numbers
             if dep.force_all_dep_nr:
                 continue
@@ -336,7 +343,7 @@ class AssetDepreciationLine(models.Model):
         self.mapped("move_id").unlink()
 
     def generate_account_move(self):
-        for line in self.filtered(lambda l: l.needs_account_move()):
+        for line in self.filtered(lambda line: line.needs_account_move()):
             line.generate_account_move_single()
 
     def generate_account_move_single(self):
@@ -349,7 +356,7 @@ class AssetDepreciationLine(models.Model):
 
         line_vals = self.get_account_move_line_vals()
         for v in line_vals:
-            vals["line_ids"].append((0, 0, v))
+            vals["line_ids"].append(Command.create(v))
 
         self.move_id = am_obj.create(vals)
 
@@ -379,7 +386,7 @@ class AssetDepreciationLine(models.Model):
         Maps line `move_type` to its own method for generating move lines.
         """
         return {
-            t: getattr(self, "get_{}_account_move_line_vals".format(t), False)
+            t: getattr(self, f"get_{t}_account_move_line_vals", False)
             for t in dict(self._fields["move_type"].selection).keys()
         }
 
@@ -473,7 +480,7 @@ class AssetDepreciationLine(models.Model):
         dep.ensure_one()
         types = ("gain", "loss")
         gain_or_loss = self.filtered(
-            lambda l: l.needs_account_move() and l.move_type in types
+            lambda line: line.needs_account_move() and line.move_type in types
         )
         if gain_or_loss:
             gain_or_loss.generate_account_move_single()
@@ -484,7 +491,7 @@ class AssetDepreciationLine(models.Model):
         dep.ensure_one()
         types = ("depreciated", "gain", "loss")
         to_create_move = self.filtered(
-            lambda l: l.needs_account_move() and l.move_type in types
+            lambda line: line.needs_account_move() and line.move_type in types
         )
         if to_create_move:
             to_create_move.generate_account_move()

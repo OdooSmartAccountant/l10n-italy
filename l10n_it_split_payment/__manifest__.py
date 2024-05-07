@@ -16,6 +16,7 @@
         "account",
     ],
     "data": [
+        "data/account_tax_group_data.xml",
         "views/account_view.xml",
         "views/config_view.xml",
     ],

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ~ Copyright 2023 Simone Rubino - Aion Tech
+  ~ License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
+  -->
 <odoo>
 
     <record model="ir.ui.view" id="asset_search_view">
@@ -91,9 +95,19 @@
                                 groups="base.group_multi_company"
                             />
                             <field
+                                name="company_id"
+                                invisible="True"
+                                groups="!base.group_multi_company"
+                            />
+                            <field
                                 name="currency_id"
                                 attrs="{'readonly': [('state', '!=', 'non_depreciated')]}"
                                 groups="base.group_multi_currency"
+                            />
+                            <field
+                                name="currency_id"
+                                invisible="True"
+                                groups="!base.group_multi_currency"
                             />
                         </group>
                     </group>
@@ -117,33 +131,42 @@
                             <field name="sale_date" />
                             <field name="sale_amount" />
                             <field name="sold" />
+                            <field name="dismiss_date" />
+                            <field name="dismissed" />
                         </group>
                     </group>
                     <notebook>
                         <page string="Depreciations" name="depreciations">
-                            <field
-                                name="depreciation_ids"
-                                context="{'default_asset_id':id}"
-                                nolabel="1"
-                            >
-                                <tree>
-                                    <field name="asset_id" invisible="1" />
-                                    <field name="type_id" />
-                                    <field name="mode_id" />
-                                    <field name="pro_rata_temporis" />
-                                    <field name="date_start" />
-                                    <field name="percentage" />
-                                    <field name="base_coeff" />
-                                    <field name="amount_depreciable" />
-                                    <field name="amount_depreciable_updated" />
-                                    <field name="amount_depreciated" />
-                                    <field name="last_depreciation_date" />
-                                    <field name="amount_residual" />
-                                    <field name="state" invisible="1" force_save="1" />
-                                    <field name="currency_id" invisible="1" />
-                                    <field name="company_id" invisible="1" />
-                                </tree>
-                            </field>
+                            <group>
+                                <field
+                                    name="depreciation_ids"
+                                    context="{'default_asset_id':id}"
+                                    colspan="2"
+                                    nolabel="1"
+                                >
+                                    <tree>
+                                        <field name="asset_id" invisible="1" />
+                                        <field name="type_id" />
+                                        <field name="mode_id" />
+                                        <field name="pro_rata_temporis" />
+                                        <field name="date_start" />
+                                        <field name="percentage" />
+                                        <field name="base_coeff" />
+                                        <field name="amount_depreciable" />
+                                        <field name="amount_depreciable_updated" />
+                                        <field name="amount_depreciated" />
+                                        <field name="last_depreciation_date" />
+                                        <field name="amount_residual" />
+                                        <field
+                                            name="state"
+                                            invisible="1"
+                                            force_save="1"
+                                        />
+                                        <field name="currency_id" invisible="1" />
+                                        <field name="company_id" invisible="1" />
+                                    </tree>
+                                </field>
+                            </group>
                         </page>
                         <page name="accounting_info" string="Accounting Info">
                             <field
@@ -162,7 +185,6 @@
                                         name="button_unlink"
                                         type="object"
                                         string="Remove"
-                                        confirm="You confirm the removal of the current line? Depreciation line amounts will not be affected and will have to be updated manually."
                                         icon="fa-trash"
                                     />
                                 </tree>

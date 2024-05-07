@@ -1,11 +1,14 @@
 # Author(s): Silvio Gregorini (silviogregorini@openforce.it)
 # Copyright 2019 Openforce Srls Unipersonale (www.openforce.it)
+# Copyright 2022 Simone Rubino - TAKOBI
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from collections import OrderedDict
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.fields import Command
 from odoo.tools.float_utils import float_is_zero
 from odoo.tools.misc import format_amount
 
@@ -57,6 +60,8 @@ class Report(models.TransientModel):
 
     show_category_totals = fields.Boolean()
     show_sold_assets = fields.Boolean()
+    show_dismissed_assets = fields.Boolean()
+
     type_ids = fields.Many2many(
         "asset.depreciation.type",
     )
@@ -103,7 +108,10 @@ class Report(models.TransientModel):
             res = self.do_print(report_type)
         elif report_type:
             raise ValidationError(
-                _("No report has been defined for type `{}`.").format(report_type)
+                _(
+                    "No report has been defined for type `%(report_type)s`.",
+                    report_type=report_type,
+                )
             )
         else:
             raise ValidationError(
@@ -204,7 +212,7 @@ class Report(models.TransientModel):
         self.write(
             {
                 "report_category_ids": [
-                    (0, 0, {"category_id": c.id, "report_id": self.id})
+                    Command.create({"category_id": c.id, "report_id": self.id})
                     for c in categories.sorted("name")
                 ]
             }
@@ -213,7 +221,7 @@ class Report(models.TransientModel):
             report_categ.write(
                 {
                     "report_asset_ids": [
-                        (0, 0, {"asset_id": a.id, "report_id": self.id})
+                        Command.create({"asset_id": a.id, "report_id": self.id})
                         for a in self.sort_assets(assets)
                         if a.category_id == report_categ.category_id
                     ]
@@ -223,7 +231,7 @@ class Report(models.TransientModel):
             report_asset.write(
                 {
                     "report_depreciation_ids": [
-                        (0, 0, {"depreciation_id": d.id, "report_id": self.id})
+                        Command.create({"depreciation_id": d.id, "report_id": self.id})
                         for d in deps
                         if d.asset_id == report_asset.asset_id
                     ]
@@ -245,11 +253,9 @@ class Report(models.TransientModel):
                             report_dep.write(
                                 {
                                     "report_depreciation_year_line_ids": [
-                                        (
-                                            0,
-                                            0,
+                                        Command.create(
                                             {
-                                                "dep_line_ids": [(6, 0, line_ids)],
+                                                "dep_line_ids": [Command.set(line_ids)],
                                                 "fiscal_year_id": fyear.id,
                                                 "needs_previsional": prev,
                                                 "report_id": self.id,
@@ -277,9 +283,7 @@ class Report(models.TransientModel):
         self.write(
             {
                 "report_total_ids": [
-                    (
-                        0,
-                        0,
+                    Command.create(
                         dict(
                             v,
                             name=_("General Total"),
@@ -308,12 +312,21 @@ class Report(models.TransientModel):
                 ("sale_date", "=", False),
                 ("sale_date", ">=", self.date.replace(month=1, day=1)),
             ]
+        if not self.show_dismissed_assets:
+            domain += [
+                "|",
+                ("dismiss_date", "=", False),
+                ("dismiss_date", ">=", self.date.replace(month=1, day=1)),
+            ]
         return self.env["asset.asset"].search(domain)
 
     def set_report_name(self):
         report_name = _("Assets Previsional Depreciations ")
         if self.date:
-            report_name += _("to date {}").format(format_date(self, "date", "%d-%m-%Y"))
+            report_name += _(
+                "to date %(to_date)s",
+                to_date=format_date(self, "date", "%d-%m-%Y"),
+            )
         self.report_name = report_name.strip()
 
     def sort_assets(self, assets):
@@ -385,6 +398,13 @@ class ReportCategory(models.TransientModel):
                                 categ.report_id.company_id,
                                 report_date,
                             )
+                        elif fy_end < report_date:
+                            totals_by_dep_type[dep_type][fname] += line_curr._convert(
+                                last_line["amount_depreciation_fund_curr_year"],
+                                curr,
+                                categ.report_id.company_id,
+                                report_date,
+                            )
                     elif fname in (
                         "amount_in_total",
                         "amount_out_total",
@@ -417,9 +437,7 @@ class ReportCategory(models.TransientModel):
             categ.write(
                 {
                     "report_total_ids": [
-                        (
-                            0,
-                            0,
+                        Command.create(
                             dict(
                                 v,
                                 name=categ.category_id.name_get()[0][-1],
@@ -695,7 +713,7 @@ class ReportDepreciationLineByYear(models.TransientModel):
     type_name = fields.Char()
 
     def clean_unused(self):
-        self.filtered(lambda l: l.do_clean()).unlink()
+        self.filtered(lambda line: line.do_clean()).unlink()
 
     def do_clean(self):
         self.ensure_one()
@@ -707,7 +725,7 @@ class ReportDepreciationLineByYear(models.TransientModel):
         ):
             previous_line = (
                 self.report_depreciation_id.report_depreciation_year_line_ids.filtered(
-                    lambda l: l.sequence == self.sequence - 1
+                    lambda line: line.sequence == self.sequence - 1
                 )
             )
             if float_is_zero(previous_line.amount_residual, digits):
@@ -750,7 +768,9 @@ class ReportDepreciationLineByYear(models.TransientModel):
         self.ensure_one()
         dep = self.report_depreciation_id.depreciation_id
         to_date = min(self.fiscal_year_id.date_to, self.report_id.date)
-        previsional_lines = dep.generate_depreciation_lines(to_date)
+        previsional_lines = dep.with_context(
+            previsional=True
+        ).generate_depreciation_lines(to_date)
         self.dep_line_ids += previsional_lines
         self.report_id.previsional_line_ids += previsional_lines
 
@@ -776,7 +796,8 @@ class ReportDepreciationLineByYear(models.TransientModel):
             [
                 line.amount
                 for line in self.dep_line_ids.filtered(
-                    lambda l: l.move_type == "depreciated" and not l.partial_dismissal
+                    lambda line: line.move_type == "depreciated"
+                    and not line.partial_dismissal
                 )
             ]
         )
@@ -784,18 +805,25 @@ class ReportDepreciationLineByYear(models.TransientModel):
             [
                 line.amount
                 for line in self.dep_line_ids.filtered(
-                    lambda l: l.move_type == "depreciated" and l.partial_dismissal
+                    lambda line: line.move_type == "depreciated"
+                    and line.partial_dismissal
                 )
             ]
         )
 
         prev_year_line = report_dep.report_depreciation_year_line_ids.filtered(
-            lambda l: l.sequence == self.sequence - 1
+            lambda line: line.sequence == self.sequence - 1
         )
         asset = self.report_depreciation_id.report_asset_id.asset_id
         fy_start = self.fiscal_year_id.date_from
         fy_end = self.fiscal_year_id.date_to
-        if asset.sold and asset.sale_date and fy_start <= asset.sale_date <= fy_end:
+        if (
+            asset.sold and asset.sale_date and fy_start <= asset.sale_date <= fy_end
+        ) or (
+            asset.dismissed
+            and asset.dismiss_date
+            and fy_start <= asset.dismiss_date <= fy_end
+        ):
             amount_depreciable_upd = 0.0
             depreciation_fund_curr_year = 0.0
             amount_residual = 0.0
@@ -840,7 +868,8 @@ class ReportDepreciationLineByYear(models.TransientModel):
 
         type_mapping = {"in": {}, "out": {}}
         for dep_line in self.dep_line_ids.filtered(
-            lambda l: l.move_type in ("in", "out") and l.depreciation_line_type_id
+            lambda line: line.move_type in ("in", "out")
+            and line.depreciation_line_type_id
         ):
             dep_type = dep_line.depreciation_line_type_id
             if dep_type not in type_mapping[dep_line.move_type]:
@@ -852,7 +881,7 @@ class ReportDepreciationLineByYear(models.TransientModel):
         if type_mapping["in"]:
             amount_in_detail = "; ".join(
                 [
-                    "{}: {}".format(dep_type.name, self.format_amount(amount))
+                    f"{dep_type.name}: {self.format_amount(amount)}"
                     for dep_type, amount in sorted(list(type_mapping["in"].items()))
                 ]
             )
@@ -860,7 +889,7 @@ class ReportDepreciationLineByYear(models.TransientModel):
         if type_mapping["out"]:
             amount_out_detail = "; ".join(
                 [
-                    "{}: {}".format(dep_type.name, self.format_amount(amount))
+                    f"{dep_type.name}: {self.format_amount(amount)}"
                     for dep_type, amount in sorted(list(type_mapping["out"].items()))
                 ]
             )
@@ -871,7 +900,7 @@ class ReportDepreciationLineByYear(models.TransientModel):
         if start == end:
             year = str(start)
         else:
-            year = "{} - {}".format(start, end)
+            year = f"{start} - {end}"
 
         return {
             "amount_depreciable": amount_depreciable,

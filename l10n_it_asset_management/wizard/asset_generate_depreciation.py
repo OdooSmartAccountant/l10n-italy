@@ -1,8 +1,10 @@
 # Author(s): Silvio Gregorini (silviogregorini@openforce.it)
 # Copyright 2019 Openforce Srls Unipersonale (www.openforce.it)
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import api, fields, models
+from odoo.fields import Command
 
 
 class WizardAssetsGenerateDepreciations(models.TransientModel):
@@ -11,12 +13,12 @@ class WizardAssetsGenerateDepreciations(models.TransientModel):
 
     @api.model
     def get_default_company_id(self):
-        return self.env.user.company_id
+        return self.env.company
 
     @api.model
     def get_default_date_dep(self):
         fiscal_year = self.env["account.fiscal.year"].get_fiscal_year_by_date(
-            fields.Date.today(), company=self.env.user.company_id, miss_raise=False
+            fields.Date.today(), company=self.env.company, miss_raise=False
         )
         if fiscal_year:
             return fiscal_year.date_to
@@ -24,7 +26,7 @@ class WizardAssetsGenerateDepreciations(models.TransientModel):
 
     @api.model
     def get_default_type_ids(self):
-        return [(6, 0, self.env["asset.depreciation.type"].search([]).ids)]
+        return [Command.set(self.env["asset.depreciation.type"].search([]).ids)]
 
     asset_ids = fields.Many2many(
         "asset.asset",
@@ -63,9 +65,17 @@ class WizardAssetsGenerateDepreciations(models.TransientModel):
         """
         self.ensure_one()
         # Add depreciation date in context just in case
-        deps = self.get_depreciations().with_context(dep_date=self.date_dep)
-        dep_lines = deps.generate_depreciation_lines(self.date_dep)
-        deps.post_generate_depreciation_lines(dep_lines)
+        deps = self.env["asset.depreciation"]
+        all_deps = self.with_context(dep_date=self.date_dep).get_depreciations()
+        for dep in all_deps:
+            if (
+                not dep.last_depreciation_date
+                or dep.last_depreciation_date < self.date_dep
+            ):
+                deps |= dep
+        if deps:
+            dep_lines = deps.generate_depreciation_lines(self.date_dep)
+            deps.post_generate_depreciation_lines(dep_lines)
         if self._context.get("reload_window"):
             return {"type": "ir.actions.client", "tag": "reload"}
 

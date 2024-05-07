@@ -24,14 +24,6 @@
             >
                 <field name="split_payment" invisible="1" />
             </xpath>
-<!--            <field name="//group[hasclass('oe_subtotal_footer')]/field[@name='tax_totals']" position="after">-->
-<!--                <field-->
-<!--                    name="amount_sp"-->
-<!--                    widget="monetary"-->
-<!--                    options="{'currency_field': 'currency_id'}"-->
-<!--                    attrs="{'invisible': [('split_payment', '=', False)]}"-->
-<!--                />-->
-<!--            </field>-->
             <xpath
                 expr="//sheet/notebook/page/field[@name='line_ids']/tree"
                 position="inside"

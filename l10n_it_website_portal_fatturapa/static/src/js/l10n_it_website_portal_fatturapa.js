@@ -24,26 +24,27 @@ odoo.define("l10n_it_website_portal_fatturapa", function (require) {
             $electronic_invoice_subjected_input.change(compute_e_inv_fields_visibility);
 
             var $is_pa = $details_div.find("input[name='is_pa'][type='checkbox']");
-            if ($is_pa.length) {
-                var $codice_destinatario_div = $details_div
-                    .find("input[name='codice_destinatario'][type='text']")
-                    .parent();
-                var $pec_destinatario_div = $details_div
-                    .find("input[name='pec_destinatario'][type='text']")
-                    .parent();
-
-                var compute_destinatario_fields_visibility = function () {
-                    if ($is_pa[0].checked) {
-                        $codice_destinatario_div.hide();
-                        $pec_destinatario_div.hide();
-                    } else {
-                        $codice_destinatario_div.show();
-                        $pec_destinatario_div.show();
-                    }
-                };
-                compute_destinatario_fields_visibility();
-                $is_pa.change(compute_destinatario_fields_visibility);
+            if (!$is_pa.length) {
+                return;
             }
+            var $codice_destinatario_div = $details_div
+                .find("input[name='codice_destinatario'][type='text']")
+                .parent();
+            var $pec_destinatario_div = $details_div
+                .find("input[name='pec_destinatario'][type='text']")
+                .parent();
+
+            var compute_destinatario_fields_visibility = function () {
+                if ($is_pa[0].checked) {
+                    $codice_destinatario_div.hide();
+                    $pec_destinatario_div.hide();
+                } else {
+                    $codice_destinatario_div.show();
+                    $pec_destinatario_div.show();
+                }
+            };
+            compute_destinatario_fields_visibility();
+            $is_pa.change(compute_destinatario_fields_visibility);
         }
     });
 });

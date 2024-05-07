@@ -1,9 +1,11 @@
 # Author(s): Silvio Gregorini (silviogregorini@openforce.it)
 # Copyright 2019 Openforce Srls Unipersonale (www.openforce.it)
+# Copyright 2023 Simone Rubino - Aion Tech
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.fields import Command
 
 
 class Asset(models.Model):
@@ -14,7 +16,7 @@ class Asset(models.Model):
 
     @api.model
     def get_default_company_id(self):
-        return self.env.user.company_id
+        return self.env.company
 
     asset_accounting_info_ids = fields.One2many(
         "asset.accounting.info", "asset_id", string="Accounting Info"
@@ -75,9 +77,12 @@ class Asset(models.Model):
 
     sale_date = fields.Date()
 
+    dismiss_date = fields.Date()
+
     sale_move_id = fields.Many2one("account.move", string="Sale Move")
 
     sold = fields.Boolean()
+    dismissed = fields.Boolean()
 
     state = fields.Selection(
         [
@@ -99,6 +104,7 @@ class Asset(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         # Add depreciation if it's missing while category is set
+        assets = self.browse()
         for vals in vals_list:
             create_deps_from_categ = False
             if vals.get("category_id") and not vals.get("depreciation_ids"):
@@ -108,7 +114,8 @@ class Asset(models.Model):
             asset = super().create(vals)
             if create_deps_from_categ:
                 asset.onchange_category_id()
-        return asset
+            assets |= asset
+        return assets
 
     def write(self, vals):
         if vals.get("code"):
@@ -116,17 +123,7 @@ class Asset(models.Model):
         return super().write(vals)
 
     def unlink(self):
-        if self.mapped("asset_accounting_info_ids"):
-            assets = self.filtered("asset_accounting_info_ids")
-            name_list = "\n".join([a[-1] for a in assets.name_get()])
-            raise ValidationError(
-                _(
-                    "The assets you are trying to delete are currently linked"
-                    " to accounting info. Please remove them if necessary"
-                    " before removing these assets:\n"
-                )
-                + name_list
-            )
+        self.mapped("asset_accounting_info_ids").unlink()
         self.mapped("depreciation_ids").unlink()
         return super().unlink()
 
@@ -140,9 +137,10 @@ class Asset(models.Model):
             if len(comp) > 1 or (comp and comp != asset.company_id):
                 raise ValidationError(
                     _(
-                        "`{}`: cannot change asset's company once it's already"
-                        " related to accounting info."
-                    ).format(asset.make_name())
+                        "`%(asset)s`: cannot change asset's company once it's already"
+                        " related to accounting info.",
+                        asset=asset.make_name(),
+                    )
                 )
 
     @api.depends("depreciation_ids", "depreciation_ids.state")
@@ -163,13 +161,12 @@ class Asset(models.Model):
             )
 
         if self.category_id:
-
             # Remove depreciation lines
             self.depreciation_ids = False
 
             # Set new lines
             vals = self.category_id.get_depreciation_vals(self.purchase_amount)
-            self.depreciation_ids = [(0, 0, v) for v in vals]
+            self.depreciation_ids = [Command.create(v) for v in vals]
             self.onchange_purchase_amount()
             self.onchange_purchase_date()
 
@@ -184,7 +181,7 @@ class Asset(models.Model):
             for dep in self.depreciation_ids:
                 dep.amount_depreciable = self.purchase_amount * dep.base_coeff
             if self.depreciation_ids.mapped("line_ids").filtered(
-                lambda l: l.move_type == "depreciated"
+                lambda line: line.move_type == "depreciated"
             ):
                 title = _("Warning!")
                 msg = _(
@@ -208,12 +205,12 @@ class Asset(models.Model):
         ctx = dict(self._context)
         ctx.update(
             {
-                "default_asset_ids": [(6, 0, self.ids)],
-                "default_category_ids": [(6, 0, self.category_id.ids)],
+                "default_asset_ids": [Command.set(self.ids)],
+                "default_category_ids": [Command.set(self.category_id.ids)],
                 "default_company_id": self.company_id.id,
                 "default_date": fields.Date.today(),
                 "default_type_ids": [
-                    (6, 0, self.depreciation_ids.mapped("type_id").ids)
+                    Command.set(self.depreciation_ids.mapped("type_id").ids)
                 ],
             }
         )
@@ -248,5 +245,5 @@ class Asset(models.Model):
         self.ensure_one()
         name = self.name.strip()
         if self.code:
-            return "[{}] {}".format(self.code.strip(), name)
+            return f"[{self.code.strip()}] {name}"
         return name

@@ -62,8 +62,8 @@ class MigrateL10nItDdt(EasyCommand):
             map_dict[old_record] = new_record
 
     def _map_ref(self, map_dict, old_ext_id, new_ext_id):
-        old_record = self.env.ref("l10n_it_ddt.{}".format(old_ext_id))
-        new_record = self.env.ref("l10n_it_delivery_note_base.{}".format(new_ext_id))
+        old_record = self.env.ref(f"l10n_it_ddt.{old_ext_id}")
+        new_record = self.env.ref(f"l10n_it_delivery_note_base.{new_ext_id}")
 
         map_dict[old_record] = new_record
 
@@ -288,7 +288,8 @@ class MigrateL10nItDdt(EasyCommand):
                 "type_id": self._document_types[record.ddt_type_id].id,
                 "date": record.date,
                 "carrier_id": record.carrier_id.id,
-                "delivery_method_id": record.partner_id.property_delivery_carrier_id.id,
+                "delivery_method_id": record.picking_ids.mapped("carrier_id")[:1].id
+                or record.partner_id.property_delivery_carrier_id.id,
                 "transport_datetime": record.date_done,
                 "packages": record.parcels,
                 "volume": record.volume,
@@ -324,7 +325,7 @@ class MigrateL10nItDdt(EasyCommand):
         documents = Document.search([], order="id ASC")
         for document in documents:
             delivery_note = DeliveryNote.create(vals_getter(document))
-            extra_lines = document.line_ids.filtered(lambda l: not l.move_id)
+            extra_lines = document.line_ids.filtered(lambda line: not line.move_id)
 
             if extra_lines:
                 lines_vals = []
